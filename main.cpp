@@ -80,14 +80,9 @@ std::vector<LatencyResult> MeasureL1Capacity(std::size_t batchSize) {
     std::mt19937_64 generator(0xCACE23);
     std::vector<LatencyResult> results;
 
-    for (std::size_t workingSetBytes = 1024;
-         workingSetBytes <= MaxWorkingSetBytes;
-         workingSetBytes *= 2) {
+    for (std::size_t workingSetBytes = 1024; workingSetBytes <= MaxWorkingSetBytes; workingSetBytes *= 2) {
         auto cycle = MakePointerCycle(workingSetBytes, generator);
-        results.push_back({
-            workingSetBytes,
-            MeasureLatency(cycle, batchSize)
-        });
+        results.push_back({workingSetBytes, MeasureLatency(cycle, batchSize)});
     }
 
     return results;
@@ -102,8 +97,7 @@ std::size_t FindL1Transition(const std::vector<LatencyResult>& results) {
     const auto threshold = baseline * 1.5;
 
     for (std::size_t i = 1; i + 1 < results.size(); ++i) {
-        if (results[i].nanosecondsPerLoad >= threshold &&
-            results[i + 1].nanosecondsPerLoad >= threshold) {
+        if (results[i].nanosecondsPerLoad >= threshold && results[i + 1].nanosecondsPerLoad >= threshold) {
             return results[i].workingSetBytes;
         }
     }
@@ -114,17 +108,17 @@ std::size_t FindL1Transition(const std::vector<LatencyResult>& results) {
 } // namespace
 
 int main() {
-    std::cout << "Test batch size (complete pointer-cycle passes per sample): " << std::flush;
+    std::cout << "Test batch size: ";
     std::string input;
     if (!(std::cin >> input)) {
-        std::cerr << "Failed to read the test batch size.\n";
+        std::cerr << "invalid input";
         return 1;
     }
 
     std::size_t batchSize = 0;
     const auto [end, error] = std::from_chars(input.data(), input.data() + input.size(), batchSize);
     if (error != std::errc{} || end != input.data() + input.size() || batchSize == 0) {
-        std::cerr << "Batch size must be a positive integer.\n";
+        std::cerr << "invalid batch size";
         return 1;
     }
 
@@ -136,11 +130,9 @@ int main() {
 
     const auto capacityResults = MeasureL1Capacity(batchSize);
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "\nDependent-load latency by working-set size (median of "
-              << MeasurementSamples << " samples):\n";
+    std::cout << "\load latency by set size (median of " << MeasurementSamples << " samples):\n";
     for (const auto& result : capacityResults) {
-        std::cout << result.workingSetBytes / 1024 << " KiB: "
-                  << result.nanosecondsPerLoad << " ns/load\n";
+        std::cout << result.workingSetBytes / 1024 << " KiB: " << result.nanosecondsPerLoad << " ns/load\n";
     }
 
     const auto transitionBytes = FindL1Transition(capacityResults);
@@ -154,9 +146,6 @@ int main() {
     auto missCycle = MakePointerCycle(missWorkingSetBytes, generator);
     const auto missLatency = MeasureLatency(missCycle, batchSize);
 
-    std::cout << "\nL1 latency transition: between " << transitionBytes / 2 / 1024
-              << " and " << transitionBytes / 1024 << " KiB (coarse estimate)\n"
-              << "Dependent-load latency at " << missWorkingSetBytes / 1024 << " KiB "
-              << "(2x transition point; expected L1 misses, often L2 hits): "
-              << missLatency << " ns/load\n";
+    std::cout << "\nL1 latency transition: between " << transitionBytes / 2 / 1024 << " and " << transitionBytes / 1024 << " KiB (coarse estimate)\n";
+    std::cout << "load latency at " << missWorkingSetBytes / 1024 << " KiB "<< "(our expected L2 hits): " << missLatency << " ns/load\n";
 }
